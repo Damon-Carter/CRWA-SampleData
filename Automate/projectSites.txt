@@ -1,0 +1,10 @@
+# Water Sample Site Info
+#
+# These are the legal site names (after :, within []) for projects VMM, FLG, and CYN
+{"VMM": ["35CS", "59CS", "90CS", "130S", "165S", "199S", "229S", "267S", "269T", "290S", "318S", "343S", "387S", "400S", "447S", "484S", "521S", "534S", "567S", "591S", "609S", "621S", "635S", "648S", "662S", "675S", "012S", "700S", "715S", "729S", "743S", "760T", "763S", "773S", "784S", "MB-D", "MB-U", "HB-D", "HB-U", "CB-U", "CB-D", "QC", "ROV1", "ROV2"], "FLG": ["1NBS", "2LARZ", "3BU", "4LONG"], "CYN": ["ROB", "BROAD", "SP", "CB", "ND", "621S", "BR", "MOS", "FG1", "FG2", "FG3"]}
+#
+# These are the VMM site:collection pairs for sites that do not use Collection C-BABR
+{"35CS": "C-SPBR", "199S": "C-MGW", "267S": "C-SPBN", "447S": "C-SPBN", "635S": "C-BABN", "648S": "C-MGBO", "CB-U": "C-SPBR"}
+#
+# These are the VMM site:depth collection pairs for sites that do not use depth Collection N-DL
+{}
