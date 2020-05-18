@@ -1,0 +1,11 @@
+# Notes to self:
+
+- Add issue, assign to self
+- Make new branch off master
+- In new branch, edits files as required
+- Commit edits
+- Diff versus master
+- Issue pull request (like a rebase?)
+- Merge to master
+- Delete the branch
+- Close the issue
