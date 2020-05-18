@@ -409,11 +409,9 @@ def FillAccessFieldComments( fieldFile ) :
                 siteTimes[dateSiteKey] = sampleTime
 
                 if len(row[commentKey]) > 0 :
-                    if len(row[siteKey]) >0 :
+                    if len(row[siteKey]) > 0 :
                         siteComments[dateSiteKey] = row[commentKey]
                         noComments = False
-                    elif len(row[siteKey]) > 0 and len(row[commentKey]) > 0 :
-                        Warning("site "+row[siteKey]+" has comments, but not found in sampled sites")                
         csvfile.close()
         if noComments :
             print("No comments have been found for any sites in "+fieldFile)
@@ -1305,22 +1303,26 @@ for fileType in fileTypes:
             #    ApplyAnalysisRepetition(fileSuffixes[fileType]["testsToAverage"])
 
             # fill the Access data field comments, when they come from a separate file
+
             if fileSuffixes[fileType]["associated"] and fieldFile :
                 FillAccessFieldComments(fieldFile)
-
-            if ltGtFound :
-                MoveLtGtRowToTop()
-  
-            # check the data looks valid
-            SanityChecks(sampleDate)
-
-            # write the output Access data file
-            WriteAccessDataFile(fileType, YearMonthDay(sampleDate))
             
-            recordCount = recordCount + len(accessData)
+            if len(accessData):
+                if ltGtFound :
+                    MoveLtGtRowToTop()
 
-            if fileMove and (warningCount == 0 or interactive):
-                MoveCompletedFile(inputFile, "."+os.sep+"For Script", "Processed Files")
+                # check the data looks valid
+                SanityChecks(sampleDate)
+
+                # write the output Access data file
+                WriteAccessDataFile(fileType, YearMonthDay(sampleDate))
+
+                recordCount = recordCount + len(accessData)
+
+                if fileMove and (warningCount == 0 or interactive):
+                    MoveCompletedFile(inputFile, "."+os.sep+"For Script", "Processed Files")
+            else :
+                Warning("No data found in "+inputFile)
                 
         CloseWarning()
     else :
