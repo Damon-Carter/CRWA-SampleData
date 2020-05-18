@@ -1,0 +1,255 @@
+
+/**
+\file WaterDataParser.py
+\mainpage WaterDataParser.py Documentation
+
+\brief
+The WaterDataParser.py program is used to create a water sample database output file in comma-separated-value (csv) format, based on input csv files containing lab or field-measured results. 
+
+## Optional Arguments ##
+Optional arguments:
+  - -h, --help          show this help message and exit
+  - -i, --interactive   (default) queries user for instruction on warning conditions, see \ref warnings "Interactive Mode and Warnings"
+  - -a, --auto          run without user queries on warnings
+  - -nfm, --noFileMove  inhibit removal of source files, for debug
+
+# What the Program Does #
+The program looks in the WQ_Database\\"For Script" folder for the required input file names. Upon completion, the input source files are moved to the WQ_Database\\"Processed Files" folder, unless there are warnings, or unless suppressed by using -nfm. The output files are put into the WQ_Database\\"For Upload" folder.
+
+This program produces:
+    1. a .csv file for input into the Access database for each set of input files
+    2. a file listing warnings, if any warnings occur
+
+# How To Use the Program #
+## Water Data Processing Steps ##
+1. Put input data file(s) into the WQ_Database\\"For Script" folder. These files must be named and formatted correctly, see \ref inputFiles "Input Data Files".
+2. Run the Automate\WaterDataParser.py program, by double-clicking in the finder.
+3. If any warnings occurred, they are enumerated in files in the "For Script" folder, named Warnings_YYYYMMDD_MWRA.txt, Warnings_YYYYMMDD_Flagging.txt, and/or Warnings_YYYYMMDD_VMMtempdepth.txt. These files should be inspected to see if there are errors that need to be corrected in the input data. If corrections are needed, edit the input files and run the script again.
+4. The output files are in the "For Upload" folder. Check these files in the usual way before uploading them to the database.
+5. Once uploaded, move the files in the "For Upload" folder into the "Upload Data Archive" folder.
+
+\anchor inputFiles
+## Input Data Files ##
+
+### Sampling Data Files
+The program uses input files containing water sampling data.
+- The input data files must be ASCII comma-separated-value (.csv) files.
+- They must be put into the "For Script" folder.
+- They must be named by the sample date and a specific file suffix, depending on the project and lab, as
+    - YYYYMMDD_forscript_MWRA.csv for VMM MWRA lab data
+    - YYYYMMDD_forscript_AlphaLabResults.csv for VMM Alpha Lab data
+    - YYYYMMDD_forscript_VMMtempdepth.csv for VMM sampler depth, temperature, and field comments
+    - YYYYMMDD_forscript_Flagging.csv for FLG Flagging data
+    - YYYYMMDD_forscript_Cyano.csv for CYN cyanobacteria fluorometer data
+
+- The MWRA lab data file needs to have the site identifier supplied for FDUP samples. The site identifier needs to be put into the "X Test Flags" column.
+- The VMMtempdepth file comes from a template file containing column headings Site,Date/Time,Temperature (C),Depth (ft),Field Comments
+    
+- The Flagging data file comes from a template file containing column headings Text Id, Sampled Date, Site Name, E. coli Concentration, Temperature (C), Depth (ft), Comment, FDUP?. The site identifier needs to be supplied for FDUP samples, in the site column, and "yes" or "y" in the FDUP? column.
+
+- There is also support for VMM samples analyzed by Alpha Labs, and for samples analyzed in-house using a fluorometer. These also use template files to set the headings. For
+fluorometer readings, three readings are averaged into the reported value.
+
+
+### Site Data File
+In addition to the water data files, there is a file that provides site information: <tt>projectSites.txt</tt>, in the Automate folder. 
+If this file is missing, the script will create it. 
+Once created, it can be edited to add or remove sites from each of the VMM, FLG, or CYN projects. This file also sets the VMM collection methods by listing sites that are 
+not "C-BABR", and the depth measures that are not "N-DL".
+
+To add or remove sites, edit the first list in the file. Lines that begin with "#" are comments that the script ignores. The first list is of the form: 
+<br>{"VMM": [VMM sites], "FLG": [Flagging sites], "CYN": [Cyanobacteria sites]}<br>
+If you add sites, be sure to put them in quotes, comma separated, like what's in there by default. Do not insert carriage returns. Human errors in this file can 
+cause the script halt, so it may be prudent to save off a working version before editing.
+
+To change the site collection method, edit the second item in the file. This is in the form: 
+<br>{site: collection, site: collection, ...}<br>
+For example, <tt>{"35CS": "C-SPBR", "199S": "C-MGW", "267S": "C-SPBN"}</tt><br>
+Any VMM sites not in this list will report C-BABR as the collection method.
+
+The third list is for sites that do not use "N-DL" as the depth collection method. To add sites, it is the same as above, {site: collection, site: collection, ...},
+with the site and method in quotes.
+
+# How the Program Works #
+\anchor warnings
+## Interactive Mode and Warnings ##
+The program issues warnings if it detects any issues with the data in the input files.
+
+- In all cases, if there are no warnings, the script will move the input files to the archive, and no warnings file is created.
+- When not in interactive mode (using a “-a” argument), the script will issue warnings to a file in the For Script folder, Warnings_yyyymmdd_VMM.txt. If there are warnings, and the output files can be created, they will be.
+    - If there are warnings, the input files will not be moved to the archive. This allows you to review the warnings file, and either fix a problem in the input files and re-run, or if the warning can be ignored, move the input files to the archive yourself.
+    
+- When using interactive mode, the default, or using a “-i” argument, warnings will pause operation and pose a question to the user. 
+    - In cases where the user might be able to fix the problem, such as with bad data or a missing dupe site, the possible responses will include a way to enter a corrected value, ignore the problem, or quit. 
+    - In other cases, ignore or quit will be the only choice.
+    - Corrected values will appear in the output, the input files remain untouched. 
+    - If all warnings are corrected or ignored, the script will produce the output and archive the input files. 
+    - Quitting prevents the output files from being created and prevents the archiving of the input files. 
+    - The warnings file in interactive mode will record the action taken for each warning.
+
+- In all cases, running the script to the end will write the output files. Re-running will rewrite/over-write the output files.
+
+## Program Data Conversion Process ##
+
+The output data is populated from the input data per rules coded in FillAccessData(),
+FillAccessFieldComments(), and FillDupeAccessData().
+
+<table>
+<tr>
+    <th>Access File Column</th>
+    <th>Lab Data Column</th> 
+    <th>Notes</th>
+  </tr>
+  <tr>
+    <td>Activity_ID</td>
+    <td>Several</td> 
+    <td>Concatenated project, date, site, test abbreviation, and number (01 or 02) </td>
+  </tr>
+  <tr>
+    <td> Lab_ID </td>
+    <td>Text Id</td> 
+    <td>Identifier from analysis lab, None for field measurements</td>
+  </tr>
+  <tr>
+    <td> Date_Collected </td>
+    <td>Sampled Date</td> 
+    <td>Date part of sample date and time</td>
+  </tr>
+  <tr>
+    <td> Time_Collected </td>
+    <td>Sampled Date</td> 
+    <td>Time part of sample date and time</td>
+  </tr>
+  <tr>
+    <td> Site_ID </td>
+    <td>Site Name</td> 
+    <td>Sample site identifier</td>
+  </tr>
+  <tr>
+    <td> Project_ID </td>
+    <td></td> 
+    <td>Code number based on project (7 for VMM)</td>
+  </tr>
+  <tr>
+    <td>Component_ID</td>
+    <td>Name</td> 
+    <td>Analyzed parameter</td>
+  </tr>
+  <tr>
+    <td> Actual_Result </td>
+    <td>Formatted Entry</td> 
+    <td>Measured result</td>
+  </tr>
+  <tr>
+    <td> Actual_Result_Unit_ID </td>
+    <td>Display String</td> 
+    <td>Units used by the lab</td>
+  </tr>
+  <tr>
+    <td> Activity_Type_ID </td>
+    <td></td> 
+    <td>Activity code: 
+        - 6 for regular samples, 
+        - 5 for duplicate samples, 
+        - 1 for depth or temperature measures.</td>
+  </tr>
+  <tr>
+    <td> Actual_Result_Type_ID </td>
+    <td></td> 
+    <td>Code 1 for Actual. Some Cyanobacteria fields are an average of multiple measures, in which case this is code 2 for calculated</td>
+  </tr>
+  <tr>
+    <td> Result_Sample_Fraction </td>
+    <td>Name</td> 
+    <td>Total, Dissolved, or N/A, depending on the test and lab.</td>
+  </tr>
+  <tr>
+    <td> Reporting_Result </td>
+    <td>Formatted Entry</td> 
+    <td>Normally the same as the Actual_Result.
+        Special rules apply if the value has < or >:
+        - For <, the measure value is replaced with a number half way between that number and zero.
+        - For >, replace it with the number value.
+        - Result_Comment column gets "Changed censored value"
+    </td>
+  </tr>
+  <tr>
+    <td> Reporting_Result_Unit_ID </td>
+    <td>Display String</td> 
+    <td>Units used by the lab</td>
+  </tr>
+  <tr>
+    <td>Reporting_Result_Type_ID</td>
+    <td></td> 
+    <td>Normally 1 for Actual, 2 for Calculated is used in the case of < or > or averaged values</td>
+  </tr>
+  <tr>
+    <td> Collection_ID </td>
+    <td></td> 
+    <td>Abbreviation for the sampling technique, known by site.</td>
+  </tr>
+  <tr>
+    <td> Analytical_Method_ID </td>
+    <td></td> 
+    <td>Lab name for the test performed</td>
+  </tr>
+  <tr>
+    <td> Associated_ID </td>
+    <td></td> 
+    <td>Blank except for sites with sample duplicates, indicates the Activity_ID of the comparison sample.</td>
+  </tr>
+  <tr>
+    <td> Data_Type_ID </td>
+    <td></td> 
+    <td> Code 1 for Critical (most measures) or 2 for Non-critical (depth and temperature). </td>
+  </tr>
+  <tr>
+    <td>Media_Type_ID</td>
+    <td></td> 
+    <td>Code 1 for Water, always.</td>
+  </tr>
+  <tr>
+    <td>Media_Subdivision_ID</td>
+    <td></td> 
+    <td>Code 21 for Surface Water, always.</td>
+  </tr>
+  <tr>
+    <td>Relative_Depth_ID</td>
+    <td></td> 
+    <td>Code 1 for Surface, always.</td>
+  </tr>
+  <tr>
+    <td>Result_Comment</td>
+    <td></td> 
+    <td> Any comments affecting an individual result.  Results where the > or < symbol was removed say “Changed censored value”. </td>
+  </tr>
+  <tr>
+    <td>Field_Comment</td>
+    <td></td> 
+    <td>Field comments from samplers.</td>
+  </tr>
+  <tr>
+    <td>Event_Comment</td>
+    <td></td> 
+    <td> Should be the same for all results in the same sampling event. Currently always blank.</td>
+  </tr>
+  <tr>
+    <td> QAQC_Comment </td>
+    <td></td> 
+    <td>Blank except for sites with sample duplicates, which read FDUP.</td>
+  </tr>
+  <tr>
+    <td> Percent_RPD </td>
+    <td></td> 
+    <td>Blank except for sites with sample duplicates, which have the percent difference between the sample measures.</td>
+  </tr>
+  <tr>
+    <td> QAQC_Status </td>
+    <td></td> 
+    <td>Preliminary, or if the Percent_RPD is too large it reads Rejected.</td>
+  </tr>
+</table>
+
+\author Damon Carter
+\date 2020-04-19
+*/
