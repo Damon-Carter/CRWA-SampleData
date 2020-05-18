@@ -18,6 +18,7 @@ optional arguments:
   
 Version History:
 
+2020-4-21 Changed RPD_percent test limits to 20% for all tests except E. coli and Enterococci
 2020-4-19 Added version history, support for Alpha test of Chloride, changed sample fractions to be per-lab rather than per-test. Changed to new templates for input files.
 Updated collection id's. Commented out incomplete support for Survey123 and ne_cyano_data_entry input files. Added support for importing site info from a separate file.
 Removed un-hyphenated VMM sites MBD, MBU, HBD, HBU, CBU, and CBD.
@@ -131,7 +132,7 @@ def ReadWriteSiteData(dir) :
     "FLG":("1NBS","2LARZ","3BU","4LONG"), "CYN": ("ROB", "BROAD", "SP", "CB", "ND", "621S", "BR", "MOS", "FG1", "FG2", "FG3")}
     #
     ### Site collection type at each VMM site uses "C-BABR" except these exception sites
-    siteCollectionExceptions = {"35CS":"C-SPBR", "199S":"C-MGW", "267S":"C-SPBN", "447S":"C-SPBN", "635S":"C-BABN", "648S":"C-MGBO", "CB-U":"C-SPBN"}
+    siteCollectionExceptions = {"35CS":"C-SPBR", "199S":"C-MGW", "267S":"C-SPBN", "447S":"C-SPBN", "635S":"C-BABN", "648S":"C-MGBO", "CB-U":"C-SPBR"}
     #
     depthCollectionExceptions = {}
 
@@ -1184,21 +1185,21 @@ maxDateDiff = 42.0
 maxRPDTestLimits = {11:{"diff":100,"percent":100}, # Enterococci
                     12:{"diff":100,"percent":100}, # E. coli
                      6:{"diff":0.0,"percent":100}, # Chlorophyll A
-                    20:{"diff":0.0,"percent":100}, # Phaeophytin
-                    18:{"diff":0.0,"percent":100}, # PO4-P
-                    14:{"diff":0.0,"percent":100}, # NO32-N
-                     2:{"diff":0.0,"percent":100}, # NH3-N
-                    17:{"diff":0.0,"percent":100}, # TN
-                    21:{"diff":0.0,"percent":100}, # TP
-                    27:{"diff":0.0,"percent":100}, # TSS
-                     1:{"diff":0.0,"percent":100}, # cyanobacteria
-                    19:{"diff":0.0,"percent":100}, # pH
-                    22:{"diff":0.0,"percent":100}, # salinity
-                    24:{"diff":0.0,"percent":100}, # SC
-                     9:{"diff":0.0,"percent":100}, # DO
-                    10:{"diff":0.0,"percent":100}, # DO%
-                    29:{"diff":0.0,"percent":100}, # Chloride
-                    28:{"diff":0.0,"percent":100}  # Phycocyanin
+                    20:{"diff":0.0,"percent":20},  # Phaeophytin
+                    18:{"diff":0.0,"percent":20},  # PO4-P
+                    14:{"diff":0.0,"percent":20},  # NO32-N
+                     2:{"diff":0.0,"percent":20},  # NH3-N
+                    17:{"diff":0.0,"percent":20},  # TN
+                    21:{"diff":0.0,"percent":20},  # TP
+                    27:{"diff":0.0,"percent":20},  # TSS
+                     1:{"diff":0.0,"percent":20},  # cyanobacteria
+                    19:{"diff":0.0,"percent":20},  # pH
+                    22:{"diff":0.0,"percent":20},  # salinity
+                    24:{"diff":0.0,"percent":20},  # SC
+                     9:{"diff":0.0,"percent":20},  # DO
+                    10:{"diff":0.0,"percent":20},  # DO%
+                    29:{"diff":0.0,"percent":20},  # Chloride
+                    28:{"diff":0.0,"percent":20}   # Phycocyanin
                    } 
 
 ## get the date now
@@ -1257,7 +1258,7 @@ for fileType in fileTypes:
         for processFileInfo in fileList:
             ## File name to process for data
             inputFile = processFileInfo["File"]
-            
+
             ## Sample datetime date object from input filename
             sampleDate = processFileInfo["Date"]
             
