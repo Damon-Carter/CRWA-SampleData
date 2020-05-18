@@ -3,7 +3,7 @@
 This program is used to create a water sample database output file in comma-separated-value 
 (csv) format, based on input csv files containing lab or field-measured results. 
 The program looks in the "For Script" folder for the required file names. 
-Upon completion, the input source files are moved to the "Raw Data Archive" folder, 
+Upon completion, the input source files are moved to the "Processed Files" folder, 
 unless suppressed by using -nfm. The output files are put into the "For Upload" folder.
 
 This program produces:
@@ -54,7 +54,7 @@ def ParseArguments():
 ## Uses global projectCode.
 def GetProjectInputFileList() :
     dir = "For Script"
-    setPath(dir)
+    SetPath(dir)
     fileList = []
     flgFiles = []
     dateMatch = '2[0-9][0-9][0-9][01][0-9][0-3][0-9]' # this breaks in the year 3000!
@@ -75,7 +75,7 @@ def GetProjectInputFileList() :
 ## @parblock @param [in] dir Name of folder to seek for input files.
 ## If the folder is not found, it is looked for in the directory above, and if it is found there,
 ## the script working directory is set to the directory above (..)
-def setPath(dir) :
+def SetPath(dir) :
     dirFound = os.path.exists(dir)
     if not dirFound :
         dirFound = os.path.exists(".."+os.sep+dir)
@@ -944,11 +944,11 @@ analysisCodes ={"E. coli":{"abbrev":"EC", "code":12, "name":"MWRA-EC-2012", "fra
                "Temperature":{"abbrev":"Temp", "code":26, "name":"Therm-Temp-2012", "fraction":"N/A", "lower":-1.0, "upper":45.0},
                "FLG E. coli":{"abbrev":"EC",  "code":12,  "name":"G&L-EC-2012", "fraction":"Total", "lower":0.0, "upper":30000.0}}
 
-## Maximum time difference, in minutes, allowed between reported Collection_Time values for a given site and date.
+## Maximum time difference, in minutes, allowed between reported Time_Collected values for a given site and date.
 ## Times that are larger produce a warning.
 maxTimeDiff = 30.0
 
-## Maximum time difference, in days, allowed between reported Collection_date values and the date in the input file name.
+## Maximum time difference, in days, allowed between reported Date_Collected values and the date in the input file name.
 ## Date differences that are larger produce a warning.
 maxDateDiff = 22.0
 
@@ -1058,7 +1058,7 @@ for projectCode in ["FLG", "VMM", "Field"]:
             recordCount = recordCount + len(accessData)
 
             if fileMove and (warningCount == 0 or interactive):
-                MoveCompletedFile(inputFile, "."+os.sep+"For Script", "Raw Data Archive")
+                MoveCompletedFile(inputFile, "."+os.sep+"For Script", "Processed Files")
                 
         CloseWarning()
     else :
