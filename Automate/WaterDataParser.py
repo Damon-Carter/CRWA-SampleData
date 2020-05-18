@@ -235,19 +235,20 @@ def FillAccessData():
             accessDataRow["Result_Comment"] = labRow["Test Comment"]
         result = labRow["Formatted Entry"]
         accessDataRow["Actual_Result"] = result
+        accessDataRow["Actual_Result_Type_ID"] = resultTypes["Actual"]
         if result.find("<") > -1 and IsNumber(result.strip("<")) :
             accessDataRow["Reporting_Result"] = float(result.strip("<"))/2
             accessDataRow["Result_Comment"] = 'Changed censored value, removed "<" symbol, halved value'
-            accessDataRow["Actual_Result_Type_ID"] = resultTypes["Calculated"]
+            accessDataRow["Reporting_Result_Type_ID"] = resultTypes["Calculated"]
             ltGtFound = True
         elif (result.find(">")) > -1 and IsNumber(result.strip(">")) :
             accessDataRow["Reporting_Result"] = float(result.strip(">"))
             accessDataRow["Result_Comment"] = 'Changed censored value, removed ">" symbol'
-            accessDataRow["Actual_Result_Type_ID"] = resultTypes["Calculated"]
+            accessDataRow["Reporting_Result_Type_ID"] = resultTypes["Calculated"]
             ltGtFound = True
         elif IsNumber(result) :
             accessDataRow["Reporting_Result"] = result
-            accessDataRow["Actual_Result_Type_ID"] = resultTypes["Actual"]
+            accessDataRow["Reporting_Result_Type_ID"] = resultTypes["Actual"]
         else :
             Warning(accessDataRow["Activity_ID"] + " has invalid Formatted Entry result :"+result)
             continue
@@ -260,7 +261,6 @@ def FillAccessData():
         accessDataRow["Activity_Type_ID"] = GetActivityType(labRow["Test Name"], site)
         accessDataRow["Result_Sample_Fraction"] = GetAnalysisInfo(labRow)["fraction"]
         accessDataRow["Reporting_Result_Unit_ID"] = accessDataRow["Actual_Result_Unit_ID"]
-        accessDataRow["Reporting_Result_Type_ID"] = accessDataRow["Actual_Result_Type_ID"]
         accessDataRow["Collection_ID"] = GetCollectionMethod(labRow["Test Name"], site, siteCollectionExceptions)
         accessDataRow["Analytical_Method_ID"] = analysisNames[lab][abbr]["name"]
         accessDataRow["Associated_ID"] = "" # dupe info to be filled in later
@@ -968,8 +968,8 @@ fileSuffixes = {"MWRA":{"project":"VMM", "lab":"MWRA", "testsPerRow":[], "associ
                         "columns":("Sample Number","Text Id","Site Name","Description","X Trip","Sampled By","Test Location","Status","Sampled Date","Analyzed On","Analysis","Test Name","Formatted Entry","Display String","Batch","X Result Flags","FDUP Site","X Sample Flags","Test Comment")}, 
                 "VMMtempdepth":{"project":"VMM", "lab":"Field", "testsPerRow":["Temperature", "Depth"], "associated":"", 
                                 "columns":("Site Name", "Sampled Date","Temperature", "Depth", "Comment")},
-                "VMM123tempdepth":{"project":"VMM", "lab":"Field", "testsPerRow":["Temperature", "Depth"], "associated":"", 
-                                "columns":("Site Name", "x", "x", "x", "x","Temperature", "x", "x", "Depth", "x", "x", "x", "Comment","Sampled Date",)},
+                #"VMM123tempdepth":{"project":"VMM", "lab":"Field", "testsPerRow":["Temperature", "Depth"], "associated":"", 
+                #                "columns":("Site Name", "x", "x", "x", "x","Temperature", "x", "x", "Depth", "x", "x", "x", "Comment","Sampled Date",)},
                 "Flagging":{"project":"FLG", "lab":"G&L", "testsPerRow":["E. coli","Temperature", "Depth"], "associated":"", 
                             "columns":("Text Id", "Sampled Date", "Site Name", "E. coli", "Temperature", "Depth", "Comment", "FDUP Site")},
                 "AlphaLabResults":{"project":"VMM", "lab":"Alpha", "testsPerRow":[], "associated":"VMMtempdepth", 
@@ -1081,7 +1081,7 @@ maxRPDTestLimits = {11:{"diff":100,"percent":100}, # Enterococci
                    } 
 
 ## Dictionary giving tuples of site names legal per project, keyed by project name
-projectSites = {"VMM":("35CS","59CS","90CS","130S","165S","199S","229S","267S","269T","290S","318S","343S","387S","400S","447S","484S","521S","534S","567S","591S","609S","621S","635S","648S","662S","675S","012S","700S","715S","729S","743S","760T","763S","773S","784S", "MBD", "MBU", "HBD", "HBU", "CBU", "CBD", "QC","ROV1","ROV2"),
+projectSites = {"VMM":("35CS","59CS","90CS","130S","165S","199S","229S","267S","269T","290S","318S","343S","387S","400S","447S","484S","521S","534S","567S","591S","609S","621S","635S","648S","662S","675S","012S","700S","715S","729S","743S","760T","763S","773S","784S", "MBD", "MBU", "HBD", "HBU", "CBU", "CBD", "MB-D", "MB-U", "HB-D", "HB-U", "CB-U", "CB-D", "QC","ROV1","ROV2"),
 "FLG":("1NBS","2LARZ","3BU","4LONG"), "CYN": ("ROB", "BROAD", "SP", "CB", "ND", "621S", "BR", "MOS", "FG1", "FG2", "FG3")}
 projectSites["Field"] = projectSites["VMM"]
 
