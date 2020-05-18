@@ -15,30 +15,22 @@ optional arguments:
   -i, --interactive   queries user for instruction on warning conditions (default)
   -a, --auto          run without user queries on warnings
   -nfm, --noFileMove  inhibit removal of source files, for debug
+  
+Version History:
+
+2020-4-19 Added version history, support for Alpha test of Chloride, changed sample fractions to be per-lab rather than per-test. Changed to new templates for input files.
+Updated collection id's. Commented out incomplete support for Survey123 and ne_cyano_data_entry input files. Added support for importing site info from a separate file.
+Removed un-hyphenated VMM sites MBD, MBU, HBD, HBU, CBU, and CBD.
+2020-4-4  Fixed Actual Result Type ID to be Actual.
+2020-3-31 Support for Alpha Lab data and cyanobacteria files in addition to VMM and Flagging, fixes the MWRA-O&G analysis confusion; allows the FDUP Site to be the site name, FDUP, yes, or y (if the site is given in the site column); adds a sanity check that the Activity_IDs from a file are unique; and has a changed design that associates the file name suffix to be associated with the project and lab.
+2020-3-7  Changed "done" folder to "Processed Files"
+2020-2-29 Runs from Automate folder, corrections to dupe QAQC_Status field
+2020-2-27 Original version
 """   
 
 #
 # Stuff to do:
-#   set it so it can be run from Automate folder - done
-#   set QAQC_Status to Preliminary/Accepted or Preliminary/Rejected - done
-#   change to default to interactive mode - done
-#   set time and date limits as globals - done
-#   deal with "E.Coli" - done
-#   flexicate dupes - done
-#   get Alpha analysis names - done
-#   add sanity test for duplicate Activity_IDs - done
-#   add support for Hydrolab file type - need an example
-#   
-#   implement CYN reporting values, association - done
-#       fix averaging to skip missing values, don't delete rows
-#       skip duplicate depth and temp - done
-#       average of all is reporting value for all
-#       associate all in list
-#       calculated, not measured
-#       calculate percent - not needed?
-#   repair sanity checks for use in Flouro - done
-#   support VMM123?
-#   clean up, document
+# - Hydrolab
 
 ## @details Fetches user input arguments, if any, and sets variables accordingly. 
 def ParseArguments():
@@ -60,7 +52,7 @@ def ParseArguments():
 
 
 ## @parblock @param [in] fileType String that sets the file suffix to look for.
-## @return Returns a list project input files found, with a dictionary of info for each file.@endparblock
+## @return Returns a list of project input files found, with a dictionary of info for each file.@endparblock
 ## Scans the folder of data files for filename matches, returns a sorted list to be processed.
 ## Each item in the list is a dictionary of filename, sample date, and if applicable, another
 ## associated file.
@@ -103,6 +95,65 @@ def SetPath(dir) :
         print("Did not find data file folder '"+dir+"' - Quitting!")
         exit(1)
 
+## @parblock @param [in] dir Name of folder to seek for site info file.@endparblock
+## This routine sets up the per-project site lists, and the dictionary of site collection method
+## exceptions (sites that do not use basket from bridge C-BABR). 
+## If the "projectSites.txt" is not found in the Automate folder, this routine will create it.
+## Once created, the site info file can be edited separately without needing to edit this
+## Python script.
+##
+## Sets global projectSites and siteCollectionExceptions.
+def ReadWriteSiteData(dir) :
+    global projectSites, siteCollectionExceptions, depthCollectionExceptions
+    dirFound = os.path.exists(dir)
+    siteFile = dir+os.sep+"projectSites.txt"
+    if dirFound and os.path.exists(siteFile):
+        # read the site data from the file
+        objectFile = open(siteFile, 'r')
+        #for object in [projectSites, siteCollectionExceptions] :
+        a = "#"
+        while a.startswith("#") :
+            a = objectFile.readline()
+        projectSites = json.loads(a)
+        a = "#"
+        while a.startswith("#") :
+            a = objectFile.readline()
+        siteCollectionExceptions = json.loads(a)
+        a = "#"
+        while a.startswith("#") :
+            a = objectFile.readline()
+        depthCollectionExceptions = json.loads(a)
+        objectFile.close()
+        return()
+
+    ## Dictionary giving tuples of site names legal per project, keyed by project name
+    projectSites = {"VMM":("35CS","59CS","90CS","130S","165S","199S","229S","267S","269T","290S","318S","343S","387S","400S","447S","484S","521S","534S","567S","591S","609S","621S","635S","648S","662S","675S","012S","700S","715S","729S","743S","760T","763S","773S","784S", "MB-D", "MB-U", "HB-D", "HB-U", "CB-U", "CB-D", "QC","ROV1","ROV2"),
+    "FLG":("1NBS","2LARZ","3BU","4LONG"), "CYN": ("ROB", "BROAD", "SP", "CB", "ND", "621S", "BR", "MOS", "FG1", "FG2", "FG3")}
+    #
+    ### Site collection type at each VMM site uses "C-BABR" except these exception sites
+    siteCollectionExceptions = {"35CS":"C-SPBR", "199S":"C-MGW", "267S":"C-SPBN", "447S":"C-SPBN", "635S":"C-BABN", "648S":"C-MGBO", "CB-U":"C-SPBN"}
+    #
+    depthCollectionExceptions = {}
+
+    if dirFound and not os.path.exists(siteFile):
+        # file is missing, create it?
+        Warning("Expected site data file "+siteFile+" not found, re-create from internal data?")
+        objectFile = open(siteFile, 'w')
+        objectFile.write("# Water Sample Site Info\n")
+        objectFile.write("#\n")
+        objectFile.write("# These are the legal site names (after :, within []) for projects VMM, FLG, and CYN\n")
+        objectFile.write(json.dumps( projectSites)+"\n")
+        objectFile.write("#\n")
+        objectFile.write("# These are the VMM site:collection pairs for sites that do not use Collection C-BABR\n")
+        objectFile.write(json.dumps( siteCollectionExceptions)+"\n")
+        objectFile.write("#\n")
+        objectFile.write("# These are the VMM site:depth collection pairs for sites that do not use depth Collection N-DL\n")
+        objectFile.write(json.dumps( depthCollectionExceptions)+"\n")
+        objectFile.close()
+    
+    else :
+        Warning("Unable to find "+dir+" folder, using internal site lists.")
+        
 
 
 ## @parblock @param [in] fileType Type of file, sets expected column headings for reading the file
@@ -123,11 +174,32 @@ def GetLabFileData ( fileType, labFile ) :
             if len(labHeader) == 0:
                 labHeader = row # header row not currently used
             else :
-                if not row["Site Name"]:
+                if not row["Site ID"]:
                     # omit empty data rows
                     continue
                 labData.append(row)
     csvfile.close()
+
+
+## @parblock @param [in] avgParameters Dictionary of result, component pairs. @endparblock
+## This routine averages multiple cells in the data row into a single value reported as calculated.
+## For each result, a key is added to the lab data by the result name, which consists of the average of 
+## each item in the row that has the component string in the beginning of the key name.
+##
+## Modifies global labData.
+def AverageRowData(avgParameters):
+    global labData
+    for row in labData:
+        for parameter in avgParameters.keys():
+            keyMatch = avgParameters[parameter]
+            total = 0.0
+            count = 0
+            for key in row.keys():
+                if str(key).startswith(keyMatch) and IsNumber(row[key]):
+                    total = total + float(row[key])
+                    count = count + 1
+            row[parameter] = '{:4.2f}'.format(total/float(count), 0)               
+    
     
     
 ## @parblock @param [in] testsPerRow List of string test names that appear on the same row of lab data. @endparblock
@@ -152,7 +224,7 @@ def SerializeData(testsPerRow) :
                         serialRow = {}
                         for key in passAlongKeys :
                             serialRow[key] = row[key]
-                        serialRow["Test Name"] = test
+                        serialRow["Parameter"] = test
                         serialRow["Formatted Entry"] = row[test]
                         serialLabData.append(serialRow)
                 
@@ -166,7 +238,7 @@ def SerializeData(testsPerRow) :
 ## the input data. 
 ## Dupe info and VMM field comments are filled in elsewhere.
 ##    
-## Uses global projectCode, labData, fills accessData, rovAddresses, siteRows, siteTestRows, dupeSiteRows.
+## Uses global projectCode, labData, siteCollectionExceptions, and depthCollectionExceptions, fills accessData, rovAddresses, siteRows, siteTestRows, dupeSiteRows.
 def FillAccessData():
 
     # Here are the Access file output headings:
@@ -181,32 +253,38 @@ def FillAccessData():
         site = GetSiteId(labRow)
         
         # This block allows specifying FDUP as FDUP or yes in the FDUP column
-        if "FDUP Site" in labRow.keys() and labRow["FDUP Site"] and site != "FDUP" :
-            fdup = labRow["FDUP Site"].lower()
+        if "FDUP?" in labRow.keys() and labRow["FDUP?"] and site != "FDUP" :
+            fdup = labRow["FDUP?"].lower()
             if site in projectSites[projectCode] and (fdup == "fdup" or fdup.find("y") > -1) :
-                labData[rowCount]["FDUP Site"] = site
-                labData[rowCount]["Site Name"] = "FDUP"
+                #labData[rowCount]["FDUP?"] = site
+                #labData[rowCount]["Site ID"] = "FDUP"
+                labRow["FDUP?"] = site
+                labRow["Site ID"] = "FDUP"
                 site = "FDUP"
 
         if site != "FDUP" and site not in projectSites[projectCode] :
             response = WarningWithReplace("Found unknown site identifier: "+site+" not in project "+projectCode)
             if response:
                 site = response
-                labRow["Site Name"] = site
+                labRow["Site ID"] = site
         # cover the condition of the Sample Address, with no measure data
-        if labRow["Test Name"] == "Sample Address" :
+        if labRow["Parameter"] == "Sample Address" :
             # save the Sample Address to put into the Field Comment, in the row with the data
             sampleDateTime = GetSampleDateTime(labRow)
             siteDateKey = site+YearMonthDay(sampleDateTime)
             rovAddresses[siteDateKey] = labRow["Formatted Entry"]
             continue
             
+        # don't make duplicates of depth or temp measures:
+        if site == "FDUP" and (labRow["Parameter"] == "Depth (ft)" or labRow["Parameter"] == "Temperature (C)") :
+            continue
+            
         # otherwise, fill each column in accessHeadings:
         accessDataRow = {}
         activityID = GetActivityId(projectCode, labRow)
         accessDataRow["Activity_ID"] = activityID
-        if labAttributes[lab]["labID"] and not (labRow["Test Name"] == "Depth" or labRow["Test Name"] == "Temperature"):
-            accessDataRow["Lab_ID"] = labRow["Text Id"]
+        if labAttributes[lab]["labID"] and not (labRow["Parameter"] == "Depth (ft)" or labRow["Parameter"] == "Temperature (C)"):
+            accessDataRow["Lab_ID"] = labRow["Sample ID"]
         else :
             accessDataRow["Lab_ID"] = "None"
         sampleDateTime = GetSampleDateTime(labRow)
@@ -216,11 +294,11 @@ def FillAccessData():
         siteRows.append(site) # save which sites processed, for later
         if site == "FDUP" :
             # save the dupe row index for later
-            if labRow["FDUP Site"] in projectSites[projectCode]:
-                dupeSiteRows[rowCount] = labRow["FDUP Site"]
+            if labRow["FDUP?"] in projectSites[projectCode]:
+                dupeSiteRows[rowCount] = labRow["FDUP?"]
             else:
                 dupeSiteRows[rowCount] = "FDUP"
-                response = WarningWithReplace("Dupe site "+labRow["FDUP Site"]+" is invalid for project "+projectCode)
+                response = WarningWithReplace("Dupe site "+labRow["FDUP?"]+" is invalid for project "+projectCode)
                 if response :
                     dupeSiteRows[activityID] = response
 
@@ -236,7 +314,12 @@ def FillAccessData():
         result = labRow["Formatted Entry"]
         accessDataRow["Actual_Result"] = result
         accessDataRow["Actual_Result_Type_ID"] = resultTypes["Actual"]
-        if result.find("<") > -1 and IsNumber(result.strip("<")) :
+        if "averageInRow" in fileSuffixes[fileType].keys() and labRow["Parameter"] in fileSuffixes[fileType]["averageInRow"].keys():
+            accessDataRow["Reporting_Result"] = result
+            accessDataRow["Actual_Result_Type_ID"] = resultTypes["Calculated"]
+            accessDataRow["Reporting_Result_Type_ID"] = resultTypes["Calculated"]
+            accessDataRow["Result_Comment"] = 'Average of Replicates'
+        elif result.find("<") > -1 and IsNumber(result.strip("<")) :
             accessDataRow["Reporting_Result"] = float(result.strip("<"))/2
             accessDataRow["Result_Comment"] = 'Changed censored value, removed "<" symbol, halved value'
             accessDataRow["Reporting_Result_Type_ID"] = resultTypes["Calculated"]
@@ -258,21 +341,21 @@ def FillAccessData():
             accessDataRow["Actual_Result_Unit_ID"] = unitCodes[labRow["Display String"]]
         else :
             accessDataRow["Actual_Result_Unit_ID"] = analysisNames[lab][abbr]["unitID"]
-        accessDataRow["Activity_Type_ID"] = GetActivityType(labRow["Test Name"], site)
-        accessDataRow["Result_Sample_Fraction"] = GetAnalysisInfo(labRow)["fraction"]
+        accessDataRow["Activity_Type_ID"] = GetActivityType(labRow["Parameter"], site)
+        accessDataRow["Result_Sample_Fraction"] = analysisNames[lab][abbr]["fraction"]
         accessDataRow["Reporting_Result_Unit_ID"] = accessDataRow["Actual_Result_Unit_ID"]
-        accessDataRow["Collection_ID"] = GetCollectionMethod(labRow["Test Name"], site, siteCollectionExceptions)
+        accessDataRow["Collection_ID"] = GetCollectionMethod(labRow["Parameter"], site, siteCollectionExceptions, depthCollectionExceptions)
         accessDataRow["Analytical_Method_ID"] = analysisNames[lab][abbr]["name"]
         accessDataRow["Associated_ID"] = "" # dupe info to be filled in later
         accessDataRow["Data_Type_ID"] = dataTypes["Critical"]
-        if labRow["Test Name"] in nonCriticalTests :
+        if labRow["Parameter"] in nonCriticalTests :
             accessDataRow["Data_Type_ID"] = dataTypes["Non-critical"]
         accessDataRow["Media_Type_ID"] = mediaTypes["Water"]
         accessDataRow["Media_Subdivision_ID"] = mediaSubtypes["Surface Water"]
         accessDataRow["Relative_Depth_ID"] = relativeDepthTypes["Surface"]
         accessDataRow["Field_Comment"] = ""
-        if "Comment" in labRow.keys() and len(labRow["Comment"]) > 0 :
-            accessDataRow["Field_Comment"] = labRow["Comment"]
+        if "Field Comments" in labRow.keys() and len(labRow["Field Comments"]) > 0 :
+            accessDataRow["Field_Comment"] = labRow["Field Comments"]
         accessDataRow["Event_Comment"] = ""
         accessDataRow["QAQC_Comment"] = "" # dupe info to be filled in later
         accessDataRow["Percent_RPD"] = "" # dupe info to be filled in later
@@ -358,53 +441,54 @@ def FillAccessFieldComments( fieldFile ) :
                 row["Field_Comment"] = siteComments[dateSiteKey]
 
 
-## @parblock @param [in] testsToAverage List of which tests in a group get averaged together. @endparblock
-## There are instances where a single water sample has multiple measurements performed for the same parameter.
-## In this case, the multiple values for the parameter are averaged into a reporting value common to each measurement.
-## For each repeated measure, 
-##     - the measure is reported as the actual value.
-##     - the average is reported as the reporting value
-##     - the Reporting_Result_Type_ID is reported as "Calculated"
-##     - the samples averaged are reported in the Associated_ID
-##     - the Result_Comment gets text "Average of n Actual_Result values"
-## 
-## The routine assumes that rows which have the same activity ID except the last digit get grouped and averaged.
-## This routine uses global data siteTestRows, and modifies accessData.
-def ApplyAnalysisRepetition(testsToAverage) :
-    
-    # Create a list from siteTestRows.keys
-    # Find each group - look for a row that includes a test to average, then find other rows have the same root activity ID
-    #      process the rows in the group
-    #      remove the processed rows from the list to search for more groups
-    testCodes = []
-    for test in testsToAverage :
-        testCodes.append(analysisCodes[test]["code"])
-    
-    toBeProcessed = list(siteTestRows.keys())
-    for actID in siteTestRows.keys() :
-        if actID in toBeProcessed and accessData[siteTestRows[actID]]["Component_ID"] in testCodes:
-            rootID = actID[:-2]
-            group = []
-            for ID in toBeProcessed:
-                if ID.find(rootID) == 0 :
-                    group.append(ID)
-            if len(group) > 1 :
-                average = 0.0
-                for ID in group :
-                    average += float(accessData[siteTestRows[ID]]["Actual_Result"])
-                average = '{:4.2f}'.format(average/len(group), 0)
-                for ID in group :
-                    accessData[siteTestRows[ID]]["Reporting_Result"] = average
-                    accessData[siteTestRows[ID]]["Reporting_Result_Type_ID"] = resultTypes["Calculated"]
-                    subgroup = group.copy()
-                    subgroup.remove(ID)
-                    accessData[siteTestRows[ID]]["Associated_ID"] = ", ".join(subgroup)
-                    accessData[siteTestRows[ID]]["Result_Comment"] = "Average of "+str(len(group)) + " Actual_Result values"
-                    toBeProcessed.remove(ID)
-                    
-        else :
-            if actID in toBeProcessed :
-                toBeProcessed.remove(actID)
+#    ## @parblock @param [in] testsToAverage List of which tests in a group get averaged together. @endparblock
+#    ## There are instances where a single water sample has multiple measurements performed for the same parameter.
+#    ## In this case, the multiple values for the parameter are averaged into a reporting value common to each measurement.
+#    ## For each repeated measure, 
+#    ##     - the measure is reported as the actual value.
+#    ##     - the average is reported as the reporting value
+#    ##     - the Reporting_Result_Type_ID is reported as "Calculated"
+#    ##     - the samples averaged are reported in the Associated_ID
+#    ##     - the Result_Comment gets text "Average of n Actual_Result values"
+#    ## 
+#    ## The routine assumes that rows which have the same activity ID except the last digit get grouped and averaged.
+#    ## Only used for ne_cyano_data_entry files.
+#    ## This routine uses global data siteTestRows, and modifies accessData.
+#    def ApplyAnalysisRepetition(testsToAverage) :
+#
+#        # Create a list from siteTestRows.keys
+#        # Find each group - look for a row that includes a test to average, then find other rows have the same root activity ID
+#        #      process the rows in the group
+#        #      remove the processed rows from the list to search for more groups
+#        testCodes = []
+#        for test in testsToAverage :
+#            testCodes.append(analysisCodes[test]["code"])
+#
+#        toBeProcessed = list(siteTestRows.keys())
+#        for actID in siteTestRows.keys() :
+#            if actID in toBeProcessed and accessData[siteTestRows[actID]]["Component_ID"] in testCodes:
+#                rootID = actID[:-2]
+#                group = []
+#                for ID in toBeProcessed:
+#                    if ID.find(rootID) == 0 :
+#                        group.append(ID)
+#                if len(group) > 1 :
+#                    average = 0.0
+#                    for ID in group :
+#                        average += float(accessData[siteTestRows[ID]]["Actual_Result"])
+#                    average = '{:4.2f}'.format(average/len(group), 0)
+#                    for ID in group :
+#                        accessData[siteTestRows[ID]]["Reporting_Result"] = average
+#                        accessData[siteTestRows[ID]]["Reporting_Result_Type_ID"] = resultTypes["Calculated"]
+#                        subgroup = group.copy()
+#                        subgroup.remove(ID)
+#                        accessData[siteTestRows[ID]]["Associated_ID"] = ", ".join(subgroup)
+#                        accessData[siteTestRows[ID]]["Result_Comment"] = "Average of "+str(len(group)) + " Actual_Result values"
+#                        toBeProcessed.remove(ID)
+#
+#            else :
+#                if actID in toBeProcessed :
+#                    toBeProcessed.remove(actID)
     
 
 ## @details When there are sample duplicates for a given measurement at a given site, certain values are added 
@@ -491,14 +575,10 @@ def TestDupeMeasures(origMeas, dupeMeas, componentID):
 ## @return String site identifier for the sample.@endparblock
 ## Finds the site id from the lab data.
 def GetSiteId(rowData):
-    site_info = rowData["Site Name"].split("-")
-    site = site_info[-1]
-#    if "FDUP Site" in rowData.keys() and rowData["FDUP Site"] and site != "FDUP" :
-#        fdup = rowData["FDUP Site"].lower()
-#        if site in projectSites[projectCode] and (fdup == "fdup" or fdup.find("y") > -1) :
-#            rowData["FDUP Site"] = site
-#            site = "FDUP"
-#            print(site, rowData["FDUP Site"])
+    if lab == "MWRA" :
+        site = rowData["Site ID"][-4:] # get the last 4 chars
+    else:
+        site = rowData["Site ID"]
     return(site)
 
 ## @parblock @param [in] rowData Dictionary of one row of sample lab data
@@ -507,17 +587,17 @@ def GetSiteId(rowData):
 ##  This routine returns a datetime object constructed based on that format.
 def GetSampleDateTime(rowData):
     if "Sampled Time" in rowData.keys():
-        return(GetDateTimeObject(rowData["Sampled Date"]+" "+rowData["Sampled Time"]))
-    return(GetDateTimeObject(rowData["Sampled Date"]))
+        return(GetDateTimeObject(rowData["Date/Time"]+" "+rowData["Sampled Time"]))
+    return(GetDateTimeObject(rowData["Date/Time"]))
 
 ## @parblock @param [in] rowData Dictionary of one row of sample lab data
 ## @return Dictionary of analysisCodes info for the specified test type.@endparblock
 ## Returns the analysisCode dictionary of analysis test information based on the rowData Test Name.
 def GetAnalysisInfo(rowData):
-    parameter = rowData["Test Name"]
+    parameter = rowData["Parameter"]
     if parameter not in analysisCodes.keys():
         parameter = WarningWithReplace("Found unknown parameter: '"+str(parameter)+"' Legal values are " +", ".join(analysisCodes.keys()))
-        rowData["Test Name"] = parameter
+        rowData["Parameter"] = parameter
     return(analysisCodes[parameter])
     
 ## @parblock @param [in] projectCode Project code string, such as FLG, VMM, etc.
@@ -544,9 +624,9 @@ def GetActivityId(projectCode, rowData):
 ## @return Activity type code@endparblock
 ## Returns the activity type code.
 def GetActivityType(measure, site):
-    if projectCode == "CYN" :
+    if projectCode == "CYN" and site != "FDUP" :
         return(activityCodes["Field Msr/Obs-Portable Data Logger"])
-    if measure == "Depth" or measure == "Temperature":
+    if measure == "Depth (ft)" or measure == "Temperature (C)":
         return(activityCodes["Field Msr/Obs"])
     if site == "FDUP":
         return(activityCodes["Quality Control Sample-Field Replicate"])
@@ -556,20 +636,47 @@ def GetActivityType(measure, site):
 ## @parblock @param [in] measure String for the type of measurement
 ## @param [in] site String site identifier
 ## @param [in] siteCollections Dictionary of non-default collection methods by site
+## @param [in] depthCollections Dictionary of non-default depth collection methods by site
 ## @return Collection method string @endparblock
 ## Returns the colection method, C-BABR by default.
-def GetCollectionMethod(measure, site, siteCollections):
-    if measure == "Depth":
-        return("N-DL")
-    if projectCode == "CYN" :
+## - N- non-critical, depth and temperature
+## - C- critical
+## - DL - dep[th dropline
+## - BABR - basket from bridge
+## - SPBR - sampling pole from a bridge
+## - MGW - manual grab while wading
+## - SPBN - sampling pole from bank
+## - BABN - basket from bank
+## - MGBO - manual grab from a boat
+## - ISBN - in situ from bank
+## - ISBO - in situ from boat
+##
+## Uses globals projectCode and lab.
+def GetCollectionMethod(measure, site, siteCollections, depthCollections):
+    if measure == "Depth (ft)":
+        if projectCode == "FLG" :
+            return("N-ISBO")
+        elif projectCode == "CYN":
+            return("N-ISBN")
+        elif site in depthCollections.keys() :
+            return(depthCollections[site])
+        else :
+            return("N-DL")
+    if lab == "Hydrolab" :
         method = "C-MGBN"
+    elif lab == "Fluorometer":
+        method = "C-ITBN"
     elif projectCode == "FLG" :
         method = "C-MGBO"
     elif site in siteCollections.keys():
         method = siteCollections[site]
     else:
         method = "C-BABR"
-    if measure == "Temperature":
+    if measure == "Temperature (C)":
+        if projectCode == "FLG" :
+            return("N-ISBO")
+        elif projectCode == "CYN":
+            return("N-ISBN")
         method = method.replace("C-", "N-")
     return(method)
 
@@ -675,11 +782,12 @@ def SanityChecks(fileDate):
         legalTestAbbrev.append(analysisCodes[key]["abbrev"])
         legalAnalysisCodes.append(analysisCodes[key]["code"])
         #legalMethods.append(analysisNames[lab][analysisCodes[key]["abbrev"]])
-        legalFractions.append(analysisCodes[key]["fraction"])
+        #legalFractions.append(analysisCodes[key]["fraction"])
         legalLimits[analysisCodes[key]["code"]] = {"test":key, "lower":analysisCodes[key]["lower"], "upper":analysisCodes[key]["upper"]}
         
     for key in analysisNames[lab] :
         legalMethods.append(analysisNames[lab][key]["name"])
+        legalFractions.append(analysisNames[lab][key]["fraction"])
     
     legalUnits = []
     for unit in unitCodes.keys() :
@@ -688,7 +796,7 @@ def SanityChecks(fileDate):
     for key in activityCodes :
         legalActivities.append(activityCodes[key])
     
-    legalCollects = ["C-BABR","C-SPBR", "C-MGW", "C-SPBN", "C-BABN", "C-MGBO", "N-DL","N-BABR","N-SPBR", "N-MGW", "N-SPBN", "N-BABN", "N-MGBO", "C-MGBN", "N-MGBN"]
+    legalCollects = ["C-BABR","C-SPBR", "C-MGW", "C-SPBN", "C-BABN", "C-MGBO", "N-DL","N-BABR","N-SPBR", "N-MGW", "N-SPBN", "N-BABN", "N-MGBO", "C-MGBN", "N-MGBN", "C-ITBN", "N-ITBN", "N-ISBO", "N-ISBN"]
     
     prj = projectCode
     if projectCode == "Field":
@@ -939,7 +1047,7 @@ def MoveCompletedFile(dataFile, path, dirName):
 #  ############################################-
 
 
-import sys, os.path, argparse, csv, time, shutil, fnmatch
+import sys, os.path, argparse, csv, time, shutil, fnmatch, json
 from datetime import datetime, timedelta
 
 ## Save start time
@@ -965,21 +1073,28 @@ projectCodes = {"CYN":1, "FLG":3, "VMM":7, "Field":7}
 
 ## Dictionary containing the partial file names to use in naming input files, and info associated with each file type.
 fileSuffixes = {"MWRA":{"project":"VMM", "lab":"MWRA", "testsPerRow":[], "associated":"VMMtempdepth", 
-                        "columns":("Sample Number","Text Id","Site Name","Description","X Trip","Sampled By","Test Location","Status","Sampled Date","Analyzed On","Analysis","Test Name","Formatted Entry","Display String","Batch","X Result Flags","FDUP Site","X Sample Flags","Test Comment")}, 
-                "VMMtempdepth":{"project":"VMM", "lab":"Field", "testsPerRow":["Temperature", "Depth"], "associated":"", 
-                                "columns":("Site Name", "Sampled Date","Temperature", "Depth", "Comment")},
-                #"VMM123tempdepth":{"project":"VMM", "lab":"Field", "testsPerRow":["Temperature", "Depth"], "associated":"", 
-                #                "columns":("Site Name", "x", "x", "x", "x","Temperature", "x", "x", "Depth", "x", "x", "x", "Comment","Sampled Date",)},
-                "Flagging":{"project":"FLG", "lab":"G&L", "testsPerRow":["E. coli","Temperature", "Depth"], "associated":"", 
-                            "columns":("Text Id", "Sampled Date", "Site Name", "E. coli", "Temperature", "Depth", "Comment", "FDUP Site")},
+                        "columns":("Sample Number","Sample ID","Site ID","Description","X Trip","Sampled By","Test Location","Status","Date/Time","Analyzed On","Analysis","Parameter","Formatted Entry","Display String","Batch","X Result Flags","FDUP?","X Sample Flags","Test Comment")}, 
+                "VMMtempdepth":{"project":"VMM", "lab":"Field", "testsPerRow":["Temperature (C)", "Depth (ft)"], "associated":"", 
+                                "columns":("Site ID", "Date/Time","Temperature (C)", "Depth (ft)", "Field Comments")},
+                #"VMM123tempdepth":{"project":"VMM", "lab":"Field", "testsPerRow":["Temperature (C)", "Depth (ft)"], "associated":"", 
+                #                "columns":("Site ID", "x", "x", "x", "x","Temperature (C)", "x", "x", "Depth (ft)", "x", "x", "x", "Field Comments","Date/Time",)},
+                "Flagging":{"project":"FLG", "lab":"G&L", "testsPerRow":["E. coli","Temperature (C)", "Depth (ft)"], "associated":"", 
+                            "columns":("Sample ID", "Site ID", "Date/Time", "E. coli", "Temperature (C)", "Depth (ft)", "Field Comments", "FDUP?")},
                 "AlphaLabResults":{"project":"VMM", "lab":"Alpha", "testsPerRow":[], "associated":"VMMtempdepth", 
-                             "columns":("Text Id", "Site Name", "Sampled Date", "Test Name", "Formatted Entry", "FDUP Site")},
-                "Fluoro":{"project":"CYN", "lab":"Fluorometer", "testsPerRow":["Temperature", "Chlorophyll A", "Cyanophyta density", "Depth"], "associated":"", 
-                          "columns":("x","x","x","x","x","x","x","x","Site Name","x","x","x","x","x","Text Id","Sampled Date", "Sampled Time", "x","x", "Temperature", "x","x","x","x", "Chlorophyll A", "Cyanophyta density", "analysis_rep", "x","Comment", "x", "Depth"),
-                         "testsToAverage":["Chlorophyll A", "Cyanophyta density"]},
-                "Hydrolab":{"project":"CYN", "lab":"Hydrolab", "testsPerRow":[], "associated":"", "columns":()}
+                             "columns":("Sample ID", "Site ID", "Date/Time", "Parameter", "Formatted Entry", "FDUP?")},
+                #"Fluoro":{"project":"CYN", "lab":"Fluorometer", "testsPerRow":["Temperature (C)", "Chlorophyll A", "Cyanophyta density", "Depth (ft)"], "associated":"", 
+                #          "columns":("x","x","x","x","x","x","x","x","Site ID","x","x","x","x","x","Sample ID","Date/Time", "Sampled Time", "x","x", "Temperature (C)", "x","x","x","x", "Chlorophyll A", "Cyanophyta density", "analysis_rep", "x","Field Comments", "x", "Depth (ft)"),
+                #         "testsToAverage":["Chlorophyll A", "Cyanophyta density"]},
+                "Cyano":{"project":"CYN", "lab":"Fluorometer", "testsPerRow":["Temperature (C)", "Depth (ft)", "Phycocyanin", "Chlorophyll A"], "associated":"", 
+                          "columns":("Site ID","Date/Time", "FDUP?","Temperature (C)", "Depth (ft)","x","x","Field Comments", "x","x", "FQ PC Rep1 (ug/L)", "FQ CA Rep1 (ug/L)","x","FQ PC Rep2 (ug/L)","FQ CA Rep2 (ug/L)", "x", "FQ PC Rep3 (ug/L)", "FQ CA Rep3 (ug/L)"),
+                         "averageInRow":{"Phycocyanin":"FQ PC Rep", "Chlorophyll A":"FQ CA Rep"}},
+                #"Hydrolab":{"project":"CYN", "lab":"Hydrolab", "testsPerRow":[], "associated":"", "columns":()}
                }
-
+# Alpha template headings Alpha Sample ID, Site ID, Date/Time, Parameter, Result, FDUP?
+# VMMtempdepth template headings are Site ID, Date/Time, Temperature (C), Depth (ft), Field Comments
+# Flagging template headings are G&L Lab. ID #, Site ID, Date/Time, E. coli Result (CFU/100mL), Temperature (C), Depth (ft), Field Comments, FDUP?
+# Cyano template headings are
+# Site ID,Sample Date/Time,FDUP?,Temperature (C),Depth (ft),Field PC (ug/L),Field CA (ug/L),Field Comments,Analysis Date,Temp Rep1 (C),FQ PC Rep1 (ug/L),FQ CA Rep1 (ug/L),Temp Rep2 (C),FQ PC Rep2 (ug/L),FQ CA Rep2 (ug/L),Temp Rep3 (C),FQ PC Rep3 (ug/L),FQ CA Rep3 (ug/L)
 
 ## Dictionary of activity codes keyed by name
 activityCodes = {"Sample-Routine":6, "Quality Control Sample-Field Replicate":5, "Field Msr/Obs":1, "Field Msr/Obs-Portable Data Logger":2}
@@ -990,46 +1105,50 @@ resultTypes = {"Actual":1, "Calculated":2}
 ## Dictionary of unit codes keyed by name
 unitCodes = {"MPN/100ml":10, "MPN/100 mL":10, "ug/L":13, "mg/L":7, "deg C":4, "ft":5, "cfu/100ml":3, "cells/ml":2, "volts":16, "% Sat":1, "cells/ml":2, "m":6, "pH units":11, "ppth":12, "uS/cm":15}
 
-## Dictionary of analyses indexed by name, with abbreviation, component code, sample fraction, lower and upper limit
-analysisCodes ={"E. coli":{"abbrev":"EC", "code":12, "fraction":"Total", "lower":0.0, "upper":30000.0},
-               "Chlorophyll A":{"abbrev":"CA", "code":6, "fraction":"Total", "lower":0.0, "upper":200.0},
-               "Phaeophytin":{"abbrev":"PP", "code":20, "fraction":"Total", "lower":0.0, "upper":20.0},
-               "PO4-P":{"abbrev":"OP", "code":18, "fraction":"Dissolved", "lower":0.0, "upper":0.08},
-               "NO32-N":{"abbrev":"NN", "code":14, "fraction":"Total", "lower":0.0, "upper":10.0},
-               "NH3-N":{"abbrev":"NH3", "code":2, "fraction":"Dissolved", "lower":0.0, "upper":0.6},
-               "Enterococci":{"abbrev":"ENT", "code":11, "fraction":"Total", "lower":0.0, "upper":20000.0},
-               "TN":{"abbrev":"TN", "code":17, "fraction":"Total", "lower":0.0, "upper":15.0},
-               "TP":{"abbrev":"TP", "code":21, "fraction":"Total", "lower":0.0, "upper":8.0},
-               "TSS":{"abbrev":"TSS", "code":27, "fraction":"Total", "lower":0.0, "upper":100.0},
-               "Depth":{"abbrev":"DTH", "code":8, "fraction":"N/A", "lower":0.25, "upper":35.0},
-               "Temperature":{"abbrev":"Temp", "code":26, "fraction":"N/A", "lower":-1.0, "upper":45.0},
-               "Dissolved Oxygen Saturation":{"abbrev":"DO%", "code":10, "fraction":"N/A", "lower":0.0, "upper":200.0},
-               "Dissolved Oxygen":{"abbrev":"DO", "code":9, "fraction":"N/A", "lower":0.0, "upper":25.0},
-               "Fecal coliform":{"abbrev":"FC", "code":13, "fraction":"Total", "lower":0.0, "upper":450000.0},
-               "Sodium":{"abbrev":"NA", "code":23, "fraction":"Total", "lower":0.0, "upper":300.0},
-               "Surfactants":{"abbrev":"SFT", "code":25, "fraction":"Total", "lower":0.0, "upper":1.0},
-               "Cyanophyta voltage":{"abbrev":"PCYV", "code":1, "fraction":"N/A", "lower":0.0, "upper":250000.0},
-               "Cyanophyta density":{"abbrev":"PCY", "code":1, "fraction":"N/A", "lower":0.0, "upper":40000.0},
-               "pH":{"abbrev":"PH", "code":19, "fraction":"N/A", "lower":6.0, "upper":9.0},
-               "Salinity":{"abbrev":"SAL", "code":22, "fraction":"N/A", "lower":-0.05, "upper":7.0},
-               "Specific conductance":{"abbrev":"SC", "code":24, "fraction":"N/A", "lower":0.0, "upper":60000.0}
+## Dictionary of analyses indexed by name, with abbreviation, component code, lower and upper limit
+analysisCodes ={"E. coli":{"abbrev":"EC", "code":12, "lower":0.0, "upper":30000.0},
+               "Chlorophyll A":{"abbrev":"CA", "code":6, "lower":0.0, "upper":200.0},
+               "Phaeophytin":{"abbrev":"PP", "code":20, "lower":0.0, "upper":20.0},
+               "PO4-P":{"abbrev":"OP", "code":18, "lower":0.0, "upper":0.08},
+               "NO32-N":{"abbrev":"NN", "code":14, "lower":0.0, "upper":10.0},
+               "NH3-N":{"abbrev":"NH3", "code":2, "lower":0.0, "upper":0.6},
+               "Enterococci":{"abbrev":"ENT", "code":11, "lower":0.0, "upper":20000.0},
+               "TN":{"abbrev":"TN", "code":17, "lower":0.0, "upper":15.0},
+               "Phosphorus (TP)":{"abbrev":"TP", "code":21, "lower":0.0, "upper":8.0},
+               "Total Suspended Solids (TSS)":{"abbrev":"TSS", "code":27, "lower":0.0, "upper":100.0},
+               "Depth (ft)":{"abbrev":"DTH", "code":8, "lower":0.25, "upper":35.0},
+               "Temperature (C)":{"abbrev":"Temp", "code":26, "lower":-1.0, "upper":45.0},
+               "Dissolved Oxygen Saturation":{"abbrev":"DO%", "code":10, "lower":0.0, "upper":200.0},
+               "Dissolved Oxygen":{"abbrev":"DO", "code":9, "lower":0.0, "upper":25.0},
+               "Fecal coliform":{"abbrev":"FC", "code":13, "lower":0.0, "upper":450000.0},
+               "Sodium (Na)":{"abbrev":"NA", "code":23, "lower":0.0, "upper":300.0},
+               "Surfactants":{"abbrev":"SFT", "code":25, "lower":0.0, "upper":1.0},
+               "Cyanophyta voltage":{"abbrev":"PCYV", "code":1, "lower":0.0, "upper":250000.0},
+               "Cyanophyta density":{"abbrev":"PCY", "code":1, "lower":0.0, "upper":40000.0},
+               "Phycocyanin":{"abbrev":"PC", "code":28, "lower":0.0, "upper":40000.0},
+               "pH":{"abbrev":"PH", "code":19, "lower":6.0, "upper":9.0},
+               "Salinity":{"abbrev":"SAL", "code":22, "lower":-0.05, "upper":7.0},
+               "Chloride":{"abbrev":"CLD", "code":29, "lower": 0.0, "upper":860.0},
+               "Specific conductance":{"abbrev":"SC", "code":24, "lower":0.0, "upper":60000.0}
                }
 analysisCodes["E. Coli"] = analysisCodes["E. coli"] # spelling tolerance
+analysisCodes["TSS"] = analysisCodes["Total Suspended Solids (TSS)"] # set MWRA name equal to Alpha name
+analysisCodes["TP"] = analysisCodes["Phosphorus (TP)"] # 
 
-## Dictionary per lab for the analysis names and units to apply to a given test type. The analyses are keyed by the analysis
+## Dictionary per lab for the analysis names, sample fraction, and units to apply to a given test type. The analyses are keyed by the analysis
 ## abbreviation. For example, analysisNames["G&L"]["EC"]["name"] gives "G&L-EC-2012".
-## The units are specified because the units can differ by lab.
-analysisNames = {"MWRA":{"EC":{"name":"MWRA-EC-2012", "unitID":10}, "CA":{"name":"MWRA-ChlorA-2012", "unitID":13},"PP":{"name":"MWRA-Phaeo-2012", "unitID":13},"OP":{"name":"MWRA-OPD-2012", "unitID":7},"NN":{"name":"MWRA-N/N-2012", "unitID":7}, "NH3":{"name":"MWRA-NH3D-2012", "unitID":7}, "ENT":{"name":"MWRA-Ent-2012", "unitID":10}, "TN":{"name":"MWRA-TN-2012", "unitID":7}, "TP":{"name":"MWRA-TP-2012", "unitID":7}, "TSS":{"name":"MWRA-TSS-2012", "unitID":7}},
+## The units and sample fraction are specified because they can differ by lab.
+analysisNames = {"MWRA":{"EC":{"name":"MWRA-EC-2012", "fraction":"Total", "unitID":10}, "CA":{"name":"MWRA-ChlorA-2012", "fraction":"Total", "unitID":13},"PP":{"name":"MWRA-Phaeo-2012", "fraction":"Total", "unitID":13},"OP":{"name":"MWRA-OPD-2012", "fraction":"Dissolved", "unitID":7},"NN":{"name":"MWRA-N/N-2012", "fraction":"Total", "unitID":7}, "NH3":{"name":"MWRA-NH3D-2012", "fraction":"Dissolved", "unitID":7}, "ENT":{"name":"MWRA-Ent-2012", "fraction":"Total", "unitID":10}, "TN":{"name":"MWRA-TN-2012", "fraction":"Total", "unitID":7}, "TP":{"name":"MWRA-TP-2012", "fraction":"Total", "unitID":7}, "TSS":{"name":"MWRA-TSS-2012", "fraction":"Total", "unitID":7}},
 
-"Alpha":{"EC":{"name":"Alpha-EC-2012", "unitID":10}, "CA":{"name":"Alpha-ChlorA-2012", "unitID":13},"OP":{"name":"Alpha-OPD-2012", "unitID":7},"NN":{"name":"Alpha-N/N-2012", "unitID":7}, "NH3":{"name":"Alpha-NH3D-2012", "unitID":7}, "ENT":{"name":"Alpha-Ent-2012", "unitID":10}, "TN":{"name":"Alpha-TN-2012", "unitID":7}, "TP":{"name":"Alpha-TP-2012", "unitID":7}, "TSS":{"name":"Alpha-TSS-2012", "unitID":7},"FC":{"name":"Alpha-FC-2012", "unitID":10},"NA":{"name":"Alpha-NA-2012", "unitID":7},"SFT":{"name":"Alpha-SFT-2012", "unitID":12}},
+"Alpha":{"EC":{"name":"Alpha-EC-2012", "fraction":"Total", "unitID":10}, "CA":{"name":"Alpha-ChlorA-2012", "fraction":"Total", "unitID":13},"OP":{"name":"Alpha-OPD-2012", "fraction":"Dissolved", "unitID":7},"NN":{"name":"Alpha-N/N-2012", "fraction":"Total", "unitID":7}, "NH3":{"name":"Alpha-NH3D-2012", "fraction":"Dissolved", "unitID":7}, "ENT":{"name":"Alpha-Ent-2012", "fraction":"Total", "unitID":10}, "TN":{"name":"Alpha-TN-2012", "fraction":"Total", "unitID":7}, "TP":{"name":"Alpha-TP-2012", "fraction":"Total", "unitID":7}, "TSS":{"name":"Alpha-TSS-2012", "fraction":"Total", "unitID":7},"FC":{"name":"Alpha-FC-2012", "fraction":"Total", "unitID":10},"NA":{"name":"Alpha-Na-2012", "fraction":"Total", "unitID":7},"SFT":{"name":"Alpha-SFT-2012", "fraction":"Total", "unitID":12}, "CLD":{"name":"Alpha-Cl-2012", "fraction":"Total", "unitID":7}},
 
-"Field":{"DTH":{"name":"Field-Depth-2012", "unitID":5}, "Temp":{"name":"Therm-Temp-2012", "unitID":4}},
+"Field":{"DTH":{"name":"Field-Depth-2012", "fraction":"N/A", "unitID":5}, "Temp":{"name":"Therm-Temp-2012", "fraction":"N/A", "unitID":4}},
 
-"G&L":{"EC":{"name":"G&L-EC-2012", "unitID":10}},
+"G&L":{"EC":{"name":"G&L-EC-2012", "fraction":"Total", "unitID":10}},
         
-"Hydrolab":{"DO%":{"name":"Hydrolab-DO-2012", "unitID":1}, "CA":{"name":"ChlorA-Beagle", "unitID":13}, "DO":{"name":"Hydrolab-DO-2012", "unitID":7},"PCYV":{"name":"Hydrolab-PCYV-2012", "unitID":2}, "PCY":{"name":"Hydrolab-PCY-2012", "unitID":16}, "PH":{"name":"Hydrolab-pH-2012", "unitID":11}, "SAL":{"name":"Hydrolab-Salinity-2012", "unitID":12}, "SC":{"name":"Hydrolab-SC-2012", "unitID":15}},
+"Hydrolab":{"DO%":{"name":"Hydrolab-DO-2012", "fraction":"N/A", "unitID":1}, "CA":{"name":"ChlorA-Beagle", "unitID":13}, "DO":{"name":"Hydrolab-DO-2012", "fraction":"N/A", "unitID":7},"PCYV":{"name":"Hydrolab-PCYV-2012", "fraction":"N/A", "unitID":2}, "PCY":{"name":"Hydrolab-PCY-2012", "fraction":"N/A", "unitID":16}, "PH":{"name":"Hydrolab-pH-2012", "fraction":"N/A", "unitID":11}, "SAL":{"name":"Hydrolab-Salinity-2012", "fraction":"N/A", "unitID":12}, "SC":{"name":"Hydrolab-SC-2012", "fraction":"N/A", "unitID":15}},
 
-"Fluorometer":{"CA":{"name":"ChlorA-Beagle", "unitID":13},"PCY":{"name":"PCY-Beagle", "unitID":13}}
+"Fluorometer":{"CA":{"name":"FluoroQuik-ChlorA", "fraction":"N/A", "unitID":13},"PC":{"name":"FluoroQuik-PC", "fraction":"N/A", "unitID":13}}
 }
 # copy temperature and depth info to other lab types
 for fieldParameter in analysisNames["Field"].keys():
@@ -1038,17 +1157,17 @@ for fieldParameter in analysisNames["Field"].keys():
     analysisNames["G&L"][fieldParameter] = analysisNames["Field"][fieldParameter]
     
 
-## Dictionary per fileType, indicating whether the labID is used, and whether dupes are supported.
+## Dictionary per lab, indicating whether the labID is used, and whether dupes are supported.
 labAttributes = {"MWRA":{"labID":True, "dupeSupport":True},
                 "Field":{"labID":False, "dupeSupport":False},
                 "Alpha":{"labID":True, "dupeSupport":True},
                 "G&L":{"labID":True, "dupeSupport":True},
                 "Hydrolab":{"labID":False, "dupeSupport":True},
-                "Fluorometer":{"labID":False, "dupeSupport":False}
+                "Fluorometer":{"labID":False, "dupeSupport":True}
                 }
 
 ## List of tests that are always non-critical.
-nonCriticalTests = ("Depth", "Temperature")
+nonCriticalTests = ("Depth (ft)", "Temperature (C)")
     
 ## Maximum time difference, in minutes, allowed between reported Time_Collected values for a given site and date.
 ## Times that are larger produce a warning.
@@ -1064,7 +1183,7 @@ maxDateDiff = 42.0
 ## between values that are small.  There is a set of limits per analysis type.
 maxRPDTestLimits = {11:{"diff":100,"percent":100}, # Enterococci
                     12:{"diff":100,"percent":100}, # E. coli
-                     6:{"diff":0.0,"percent":100}, # Chlorophyll AS
+                     6:{"diff":0.0,"percent":100}, # Chlorophyll A
                     20:{"diff":0.0,"percent":100}, # Phaeophytin
                     18:{"diff":0.0,"percent":100}, # PO4-P
                     14:{"diff":0.0,"percent":100}, # NO32-N
@@ -1077,16 +1196,29 @@ maxRPDTestLimits = {11:{"diff":100,"percent":100}, # Enterococci
                     22:{"diff":0.0,"percent":100}, # salinity
                     24:{"diff":0.0,"percent":100}, # SC
                      9:{"diff":0.0,"percent":100}, # DO
-                    10:{"diff":0.0,"percent":100}  # DO%
+                    10:{"diff":0.0,"percent":100}, # DO%
+                    29:{"diff":0.0,"percent":100}, # Chloride
+                    28:{"diff":0.0,"percent":100}  # Phycocyanin
                    } 
 
+## get the date now
+now = time.localtime()
+## Datetime object for time now, later used for file date
+sampleDate = GetDateTimeObject(str(now[0])+str(now[1])+str(now[2]))
+## Which type of file, set empty for now
+fileType = ""
 ## Dictionary giving tuples of site names legal per project, keyed by project name
-projectSites = {"VMM":("35CS","59CS","90CS","130S","165S","199S","229S","267S","269T","290S","318S","343S","387S","400S","447S","484S","521S","534S","567S","591S","609S","621S","635S","648S","662S","675S","012S","700S","715S","729S","743S","760T","763S","773S","784S", "MBD", "MBU", "HBD", "HBU", "CBU", "CBD", "MB-D", "MB-U", "HB-D", "HB-U", "CB-U", "CB-D", "QC","ROV1","ROV2"),
-"FLG":("1NBS","2LARZ","3BU","4LONG"), "CYN": ("ROB", "BROAD", "SP", "CB", "ND", "621S", "BR", "MOS", "FG1", "FG2", "FG3")}
-projectSites["Field"] = projectSites["VMM"]
-
+projectSites = {}
 ## Site collection type at each site uses "C-BABR" except these exception sites
-siteCollectionExceptions = {"35CS":"C-SPBR", "199S":"C-MGW", "267S":"C-SPBN", "447S":"C-SPBN", "635S":"C-BABN", "648S":"C-MGBO", "CBU":"C-SPBN"}
+siteCollectionExceptions = {}
+## Depth measures at all sites are N-DL, except these
+depthCollectionExceptions = {}
+
+SetPath("For Script")
+
+# set site info
+ReadWriteSiteData("Automate")
+projectSites["Field"] = projectSites["VMM"]
 
 ## Dictionary of data type codes keyed by name
 dataTypes = {"Critical":1, "Non-critical":2, "Unknown":3}
@@ -1103,7 +1235,13 @@ relativeDepthTypes = {"Surface":1, "Midwater":2, "Near Bottom":3, "Bottom":4, "S
 ## Tuple listing the Access file output headings
 accessHeadings = ("Activity_ID","Lab_ID","Date_Collected","Time_Collected","Site_ID","Project_ID","Component_ID","Actual_Result","Actual_Result_Unit_ID","Activity_Type_ID","Actual_Result_Type_ID","Result_Sample_Fraction","Reporting_Result","Reporting_Result_Unit_ID","Reporting_Result_Type_ID","Collection_ID","Analytical_Method_ID","Associated_ID","Data_Type_ID","Media_Type_ID","Media_Subdivision_ID","Relative_Depth_ID","Result_Comment","Field_Comment","Event_Comment","QAQC_Comment","Percent_RPD","QAQC_Status")
 
-for fileType in fileSuffixes.keys():
+## list of fileTypes, VMMtempdepth must be last
+fileTypes = []
+fileTypes = list(fileSuffixes.keys())
+fileTypes.remove("VMMtempdepth")
+fileTypes.append("VMMtempdepth")
+
+for fileType in fileTypes:
     
     ## Project code from the fileType.
     projectCode = fileSuffixes[fileType]["project"]
@@ -1138,9 +1276,13 @@ for fileType in fileSuffixes.keys():
         
             ## This list of dictionaries contains the data from the input file.
             labData = []
-                         
+            # get the data from the file
             GetLabFileData(fileType, inputFile)
 
+            if "averageInRow" in fileSuffixes[fileType].keys() :
+                AverageRowData(fileSuffixes[fileType]["averageInRow"])
+                
+            # convert the lab data to one row per test parameter
             SerializeData(fileSuffixes[fileType]["testsPerRow"])
 
             ## Dictionary keeps track of sample address from lab file for ROV sites
@@ -1158,8 +1300,8 @@ for fileType in fileSuffixes.keys():
             if labAttributes[lab]["dupeSupport"] :
                 FillDupeAccessData()
             
-            if "testsToAverage" in fileSuffixes[fileType].keys() :
-                ApplyAnalysisRepetition(fileSuffixes[fileType]["testsToAverage"])
+            #if "testsToAverage" in fileSuffixes[fileType].keys() : # only used for ne_cyano_data_entry files
+            #    ApplyAnalysisRepetition(fileSuffixes[fileType]["testsToAverage"])
 
             # fill the Access data field comments, when they come from a separate file
             if fileSuffixes[fileType]["associated"] and fieldFile :
